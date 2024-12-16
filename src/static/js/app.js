@@ -79,7 +79,7 @@ function TodoListCard() {
     return (
         <React.Fragment>
             <AddItemForm onNewItem={onNewItem} />
-            <h2 className="custom-font" style={{ color: 'deeppink' }}>❤️晶晶的List</h2>
+            <h4 className="custom-font" style={{ color: 'deeppink' }}>❤️晶晶的List</h4>
             {sortedUser1.map(item => (
                 <ItemDisplay
                     key={item.id}
@@ -88,7 +88,7 @@ function TodoListCard() {
                     onItemRemoval={onItemRemoval}
                 />
             ))}
-            <h2 className="custom-font" style={{ color: 'green' }}>💪🏻祺祺的List</h2>
+            <h4 className="custom-font" style={{ color: 'green' }}>💪🏻祺祺的List</h4>
             {sortedUser2.map(item => (
                 <ItemDisplay
                     key={item.id}
@@ -97,7 +97,7 @@ function TodoListCard() {
                     onItemRemoval={onItemRemoval}
                 />
             ))}
-            <h2 className="custom-font" style={{ color: 'blue' }}>🌟晶晶和祺祺的List</h2>
+            <h4 className="custom-font" style={{ color: 'blue' }}>🌟晶晶和祺祺的List</h4>
             {sortedUser3.map(item => (
                 <ItemDisplay
                     key={item.id}
@@ -164,13 +164,14 @@ function AddItemForm({ onNewItem }) {
                     value={reminderDate}
                     onChange={e => setReminderDate(e.target.value)}
                     aria-describedby="basic-addon2"
-                    style={{width: '100px'}}
+	            style={{width: '100px'}}
                 />
                 <Form.Control
                     as="select"
                     value={selectedUser}
                     onChange={e => setSelectedUser(e.target.value)}
                     aria-describedby="basic-addon3"
+	    	    style={{width: '80px'}}
                 >
                     <option value="晶晶">晶晶</option>
                     <option value="祺祺">祺祺</option>
@@ -194,7 +195,12 @@ function AddItemForm({ onNewItem }) {
 function ItemDisplay({ item, onItemUpdate, onItemRemoval }) {
     const { Container, Row, Col, Button, Form } = ReactBootstrap;
     const [isEditing, setIsEditing] = React.useState(false);
+    const [editingField, setEditingField] = React.useState(null); // 新增状态来区分编辑的字段
     const [newName, setNewName] = React.useState(item.name);
+    const [newReminderDate, setNewReminderDate] = React.useState(item.reminderDate);
+    const nameInputRef = React.useRef(null);
+    const dateInputRef = React.useRef(null);
+
 
     const toggleCompletion = () => {
         fetch(`/items/${item.id}`, {
@@ -212,9 +218,11 @@ function ItemDisplay({ item, onItemUpdate, onItemRemoval }) {
     };
 
     const removeItem = () => {
-        fetch(`/items/${item.id}`, { method: 'DELETE' }).then(() =>
-            onItemRemoval(item),
-        );
+        if (window.confirm('确定删除么?')) {
+            fetch(`/items/${item.id}`, { method: 'DELETE' }).then(() =>
+                onItemRemoval(item),
+            );
+        }
     };
 
     const saveName = () => {
@@ -223,7 +231,7 @@ function ItemDisplay({ item, onItemUpdate, onItemRemoval }) {
             body: JSON.stringify({
                 name: newName,
                 completed: item.completed,
-                reminderDate: item.reminderDate.split('T')[0], // Ensure date format
+                reminderDate: newReminderDate.split('T')[0], // Ensure date format
                 user: item.user
             }),
             headers: { 'Content-Type': 'application/json' },
@@ -232,13 +240,42 @@ function ItemDisplay({ item, onItemUpdate, onItemRemoval }) {
             .then(updatedItem => {
                 onItemUpdate(updatedItem);
                 setIsEditing(false);
+                setEditingField(null); // 重置编辑字段状态
+                document.activeElement.blur(); // 移除焦点
             });
     };
+
+    React.useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                document.activeElement.blur(); // 失去所有焦点
+                setIsEditing(false); // 退出编辑模式
+                setEditingField(null); // 重置编辑字段状态
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, []);
+
+    React.useEffect(() => {
+        if (isEditing) {
+            if (editingField === 'name' && nameInputRef.current) {
+                nameInputRef.current.focus();
+            } else if (editingField === 'date' && dateInputRef.current) {
+                dateInputRef.current.focus();
+                dateInputRef.current.click();
+            }
+        }
+    }, [isEditing, editingField]);
 
     return (
         <Container fluid className={`item ${item.completed ? 'completed' : ''}`}>
             <Row>
-                <Col xs={1} className="text-center">
+                <Col xs={1} className="text-center" style={{ marginLeft: '-10px' }}>
                     <Button
                         className="toggles"
                         size="sm"
@@ -254,6 +291,7 @@ function ItemDisplay({ item, onItemUpdate, onItemRemoval }) {
                             className={`far ${
                                 item.completed ? 'fa-check-square' : 'fa-square'
                             }`}
+                            style={{ fontSize: '1.2rem', padding: '0rem' }}
                         />
                     </Button>
                 </Col>
@@ -269,18 +307,38 @@ function ItemDisplay({ item, onItemUpdate, onItemRemoval }) {
                                     saveName();
                                 }
                             }}
+                            ref={nameInputRef}
                         />
                     ) : (
-                        <span onClick={() => setIsEditing(true)}>{item.name}</span>
+                        <span onDoubleClick={() => {
+                            setIsEditing(true);
+                            setEditingField('name');
+                        }}>{item.name}</span>
                     )}
                 </Col>
-                <Col xs={3} className="text-center">
-                    {item.reminderDate}
+                <Col xs={4} className="text-center" style={{ marginTop: '2.6px' }}>
+                    {isEditing ? (
+                        <Form.Control
+                            type="date"
+                            value={newReminderDate}
+                            onChange={e => setNewReminderDate(e.target.value)}
+                            onBlur={saveName}
+                            onKeyPress={e => {
+                                if (e.key === 'Enter') {
+                                    saveName();
+                                }
+                            }}
+                            ref={dateInputRef}
+                            onFocus={(e) => e.target.showPicker()} // 使用showPicker方法
+                        />
+                    ) : (
+                        <span onDoubleClick={() => {
+                            setIsEditing(true);
+                            setEditingField('date');
+                        }}>{item.reminderDate}</span>
+                    )}
                 </Col>
-                {/* <Col xs={2} className="text-center">
-                    {item.user}
-                </Col> */}
-                <Col xs={1} className="text-center remove">
+                <Col xs={1} className="text-center remove" style={{ marginTop: '-1.5px' }}>
                     <Button
                         size="sm"
                         variant="link"

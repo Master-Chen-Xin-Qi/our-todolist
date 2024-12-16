@@ -37,7 +37,7 @@ async function init() {
         charset: 'utf8mb4',
     });
 
-    await dropTableIfExists();
+    // await dropTableIfExists();
     await createTable();
 }
 
